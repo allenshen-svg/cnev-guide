@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+data/registrations.db
+.DS_Store
+*.db-journal

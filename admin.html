@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChinaEV Admin — Registrations</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f1f5f9;color:#0f172a}
+.header{background:#0f172a;color:#fff;padding:16px 24px;display:flex;align-items:center;justify-content:space-between}
+.header h1{font-size:18px;font-weight:700}
+.header span{color:#10b981;font-size:13px}
+.container{max-width:1200px;margin:20px auto;padding:0 16px}
+.auth-box{max-width:400px;margin:80px auto;background:#fff;padding:32px;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.08)}
+.auth-box h2{margin-bottom:16px;font-size:20px}
+.auth-box input{width:100%;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;margin-bottom:12px}
+.auth-box button{width:100%;padding:10px;background:#10b981;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer}
+.auth-box button:hover{background:#059669}
+.auth-box .err{color:#ef4444;font-size:13px;margin-top:8px}
+.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:20px}
+.stat{background:#fff;border-radius:10px;padding:16px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.stat .num{font-size:28px;font-weight:800;color:#10b981}
+.stat .label{font-size:12px;color:#64748b;margin-top:2px}
+table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid #e2e8f0;font-size:13px}
+th{background:#f8fafc;font-weight:600;color:#64748b;position:sticky;top:0}
+tr:hover{background:#f0fdf4}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.badge-new{background:#dbeafe;color:#2563eb}
+.badge-contacted{background:#fef3c7;color:#d97706}
+.badge-confirmed{background:#d1fae5;color:#059669}
+.badge-completed{background:#e2e8f0;color:#475569}
+.badge-cancelled{background:#fee2e2;color:#dc2626}
+select.status-sel{padding:4px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;cursor:pointer}
+.empty{text-align:center;padding:60px;color:#94a3b8;font-size:15px}
+.toolbar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.toolbar input{padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;flex:1;max-width:300px}
+.toolbar select{padding:8px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px}
+.toolbar .count{margin-left:auto;font-size:13px;color:#64748b}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>⚡ ChinaEV Admin</h1>
+  <span id="headerInfo"></span>
+</div>
+
+<div class="container">
+  <!-- Auth -->
+  <div id="authBox" class="auth-box">
+    <h2>🔐 Admin Login</h2>
+    <input type="password" id="adminKey" placeholder="Enter admin key" onkeydown="if(event.key==='Enter')doLogin()">
+    <button onclick="doLogin()">Login</button>
+    <div id="authErr" class="err"></div>
+  </div>
+
+  <!-- Dashboard (hidden until auth) -->
+  <div id="dashboard" style="display:none">
+    <div class="stats" id="stats"></div>
+    <div class="toolbar">
+      <input type="text" id="search" placeholder="Search name, email, country…" oninput="renderTable()">
+      <select id="filterStatus" onchange="renderTable()">
+        <option value="">All Status</option>
+        <option value="new">New</option>
+        <option value="contacted">Contacted</option>
+        <option value="confirmed">Confirmed</option>
+        <option value="completed">Completed</option>
+        <option value="cancelled">Cancelled</option>
+      </select>
+      <span class="count" id="countLabel"></span>
+    </div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr>
+          <th>#</th><th>Name</th><th>Email</th><th>Country</th><th>Phone</th>
+          <th>Brands</th><th>Period</th><th>Duration</th><th>Notes</th>
+          <th>Status</th><th>Date</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div id="emptyMsg" class="empty" style="display:none">No registrations yet</div>
+  </div>
+</div>
+
+<script>
+let adminKey = '';
+let allData = [];
+
+function doLogin() {
+  adminKey = document.getElementById('adminKey').value.trim();
+  if (!adminKey) return;
+  fetchData();
+}
+
+async function fetchData() {
+  try {
+    const r = await fetch('/api/admin/registrations', { headers: { 'X-Admin-Key': adminKey } });
+    const d = await r.json();
+    if (!d.ok) { document.getElementById('authErr').textContent = d.error || 'Invalid key'; return; }
+    allData = d.data;
+    document.getElementById('authBox').style.display = 'none';
+    document.getElementById('dashboard').style.display = '';
+    document.getElementById('headerInfo').textContent = allData.length + ' registrations';
+    renderStats();
+    renderTable();
+  } catch (e) {
+    document.getElementById('authErr').textContent = 'Connection error';
+  }
+}
+
+function renderStats() {
+  const total = allData.length;
+  const byStatus = {};
+  allData.forEach(r => { byStatus[r.status] = (byStatus[r.status]||0) + 1; });
+  const countries = new Set(allData.map(r => r.country)).size;
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><div class="num">${total}</div><div class="label">Total</div></div>
+    <div class="stat"><div class="num">${byStatus.new||0}</div><div class="label">New</div></div>
+    <div class="stat"><div class="num">${byStatus.contacted||0}</div><div class="label">Contacted</div></div>
+    <div class="stat"><div class="num">${byStatus.confirmed||0}</div><div class="label">Confirmed</div></div>
+    <div class="stat"><div class="num">${countries}</div><div class="label">Countries</div></div>
+  `;
+}
+
+function renderTable() {
+  const q = (document.getElementById('search').value || '').toLowerCase();
+  const st = document.getElementById('filterStatus').value;
+  let rows = allData;
+  if (st) rows = rows.filter(r => r.status === st);
+  if (q) rows = rows.filter(r => (r.name+r.email+r.country+r.brands+r.notes).toLowerCase().includes(q));
+
+  document.getElementById('countLabel').textContent = rows.length + ' of ' + allData.length;
+  document.getElementById('emptyMsg').style.display = rows.length ? 'none' : '';
+
+  document.getElementById('tbody').innerHTML = rows.map(r => `<tr>
+    <td>${r.id}</td>
+    <td><b>${esc(r.name)}</b></td>
+    <td><a href="mailto:${esc(r.email)}">${esc(r.email)}</a></td>
+    <td>${esc(r.country)}</td>
+    <td>${esc(r.phone)}</td>
+    <td>${esc(r.brands)}</td>
+    <td>${esc(r.period)}</td>
+    <td>${esc(r.duration)}</td>
+    <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.notes)}">${esc(r.notes)}</td>
+    <td><select class="status-sel" onchange="updateStatus(${r.id},this.value)">
+      ${['new','contacted','confirmed','completed','cancelled'].map(s => `<option value="${s}"${r.status===s?' selected':''}>${s}</option>`).join('')}
+    </select></td>
+    <td style="white-space:nowrap">${r.created_at ? r.created_at.slice(0,10) : ''}</td>
+  </tr>`).join('');
+}
+
+async function updateStatus(id, status) {
+  await fetch('/api/admin/registrations/' + id, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Key': adminKey },
+    body: JSON.stringify({ status })
+  });
+  const item = allData.find(r => r.id === id);
+  if (item) item.status = status;
+  renderStats();
+}
+
+function esc(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+</script>
+</body>
+</html>
