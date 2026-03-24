@@ -56,7 +56,7 @@ def index():
 @app.route('/<path:filename>')
 def static_files(filename):
     # Only serve known static file types
-    allowed_ext = ('.html', '.css', '.js', '.json', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.webp', '.woff', '.woff2', '.ttf', '.csv')
+    allowed_ext = ('.html', '.css', '.js', '.json', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.webp', '.woff', '.woff2', '.ttf', '.csv', '.xml', '.txt')
     if not filename.lower().endswith(allowed_ext):
         abort(404)
     # Prevent path traversal
