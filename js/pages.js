@@ -67,6 +67,19 @@ function renderHome() {
     <div class="card-grid" style="margin-bottom:32px">${hot.map(carCard).join('')}</div>
     ${upcoming.length?`<div class="section-title">🚀 Coming Soon</div><div class="card-grid" style="margin-bottom:32px">${upcoming.map(carCard).join('')}</div>`:''}
     ${DB.news.length?`<div class="section-title">📰 Latest News <a href="#/news" class="more">More →</a></div><div class="news-grid">${DB.news.slice(0,3).map(newsCard).join('')}</div>`:''}
+
+    <!-- SEO Content -->
+    <div class="seo-footer">
+      <h2>Your Complete Guide to Chinese Electric Vehicles</h2>
+      <p>CNEV Guide is the most comprehensive English-language resource for Chinese electric vehicles (EVs). We cover ${DB.brands.length} leading brands including <strong>BYD</strong>, <strong>NIO</strong>, <strong>XPeng (Xpeng Motors)</strong>, <strong>Li Auto</strong>, <strong>Zeekr</strong>, <strong>AITO (Huawei)</strong>, <strong>Xiaomi EV</strong>, <strong>Deepal</strong>, <strong>Leapmotor</strong>, and more — with detailed specs, pricing, range, and performance data for ${DB.cars.length}+ models.</p>
+      <h3>Why Chinese EVs?</h3>
+      <p>China is the world's largest electric vehicle market, producing some of the most advanced and affordable EVs available today. From the <strong>BYD Seal</strong>, often compared to the Tesla Model 3, to the luxury <strong>NIO ET7</strong> with its innovative battery swap technology, to the tech-focused <strong>Xiaomi SU7</strong> — Chinese automakers are redefining what's possible in electric mobility. Many models offer 500–700 km range, advanced autonomous driving, and cutting-edge infotainment at competitive prices.</p>
+      <h3>Compare & Discover</h3>
+      <p>Use our <a href="#/compare">comparison tool</a> to compare up to 4 Chinese EVs side by side — including range (km & miles), power (kW & hp), battery capacity, acceleration, dimensions, and pricing in both CNY and USD. Browse all models by <a href="#/brands">brand</a>, filter by price range, body type, and drive type on our <a href="#/cars">all cars</a> page.</p>
+      <h3>Test Drive in China</h3>
+      <p>Planning a trip to China? <a href="#/test-drive">Register for a test drive experience</a> and drive the latest Chinese EVs firsthand at official brand showrooms and experience centers. We help international visitors coordinate test drives with BYD, NIO, XPeng, Zeekr, and other top Chinese EV brands.</p>
+      <p class="seo-keywords">Chinese electric vehicles · China EV guide · BYD cars · NIO electric car · XPeng motors · Li Auto · Zeekr · Xiaomi SU7 · Xiaomi YU7 · Chinese EV comparison · test drive China · buy Chinese EV · EV range comparison · best Chinese electric cars ${new Date().getFullYear()} · affordable electric vehicles · Chinese car brands · electric SUV China · electric sedan China · CATL battery · BYD Blade battery</p>
+    </div>
   `;
   updateCompareUI();
   requestAnimationFrame(initCarousel);
