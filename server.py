@@ -37,6 +37,16 @@ def init_db():
     )''')
     db.execute('CREATE INDEX IF NOT EXISTS idx_reg_email ON registrations(email)')
     db.execute('CREATE INDEX IF NOT EXISTS idx_reg_status ON registrations(status)')
+    db.execute('''CREATE TABLE IF NOT EXISTS messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        registration_id INTEGER NOT NULL,
+        sender TEXT NOT NULL DEFAULT 'admin',
+        content TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        read_at TEXT DEFAULT NULL,
+        FOREIGN KEY (registration_id) REFERENCES registrations(id)
+    )''')
+    db.execute('CREATE INDEX IF NOT EXISTS idx_msg_reg ON messages(registration_id)')
     db.commit()
     db.close()
 
@@ -138,6 +148,141 @@ def update_registration(rid):
 @app.route('/admin')
 def admin_page():
     return send_from_directory(BASE, 'admin.html')
+
+# ── API: admin send message ───────────────────────────────
+@app.route('/api/admin/messages', methods=['POST'])
+def send_message():
+    if not check_admin():
+        return jsonify(ok=False, error='Unauthorized'), 401
+    d = request.get_json(silent=True)
+    if not d:
+        return jsonify(ok=False, error='Invalid JSON'), 400
+    reg_id = d.get('registration_id')
+    content = (d.get('content') or '').strip()
+    if not reg_id or not content:
+        return jsonify(ok=False, error='registration_id and content required'), 400
+    if len(content) > 5000:
+        return jsonify(ok=False, error='Message too long'), 400
+    db = get_db()
+    reg = db.execute('SELECT id FROM registrations WHERE id=?', (reg_id,)).fetchone()
+    if not reg:
+        db.close()
+        return jsonify(ok=False, error='Registration not found'), 404
+    db.execute(
+        'INSERT INTO messages (registration_id, sender, content, created_at) VALUES (?,?,?,?)',
+        (reg_id, 'admin', content, datetime.utcnow().isoformat() + 'Z')
+    )
+    db.commit()
+    db.close()
+    return jsonify(ok=True, message='Message sent')
+
+# ── API: admin get messages for a registration ────────────
+@app.route('/api/admin/messages/<int:reg_id>')
+def admin_get_messages(reg_id):
+    if not check_admin():
+        return jsonify(ok=False, error='Unauthorized'), 401
+    db = get_db()
+    rows = db.execute('SELECT * FROM messages WHERE registration_id=? ORDER BY id ASC', (reg_id,)).fetchall()
+    db.close()
+    return jsonify(ok=True, data=[dict(r) for r in rows])
+
+# ── API: user check messages by email ─────────────────────
+@app.route('/api/message-token')
+def get_message_token():
+    email = (request.args.get('email') or '').strip().lower()
+    if not email or '@' not in email:
+        return jsonify(ok=False, error='Valid email required'), 400
+    db = get_db()
+    regs = db.execute('SELECT id, name FROM registrations WHERE LOWER(email)=?', (email,)).fetchall()
+    db.close()
+    if not regs:
+        return jsonify(ok=False, error='No registrations found'), 404
+    token = hmac.new(ADMIN_SECRET.encode(), email.encode(), hashlib.sha256).hexdigest()[:16]
+    return jsonify(ok=True, token=token, registrations=[dict(r) for r in regs])
+
+@app.route('/api/messages')
+def user_messages():
+    email = (request.args.get('email') or '').strip().lower()
+    token = (request.args.get('token') or '').strip()
+    if not email or not token:
+        return jsonify(ok=False, error='Email and token required'), 400
+    # Token = HMAC of email (prevents enumeration)
+    expected = hmac.new(ADMIN_SECRET.encode(), email.encode(), hashlib.sha256).hexdigest()[:16]
+    if not hmac.compare_digest(token, expected):
+        return jsonify(ok=False, error='Invalid token'), 403
+    db = get_db()
+    regs = db.execute('SELECT id, name FROM registrations WHERE LOWER(email)=?', (email,)).fetchall()
+    if not regs:
+        db.close()
+        return jsonify(ok=True, data=[])
+    reg_ids = [r['id'] for r in regs]
+    placeholders = ','.join('?' * len(reg_ids))
+    msgs = db.execute(
+        f'SELECT m.*, r.name as reg_name FROM messages m JOIN registrations r ON m.registration_id=r.id WHERE m.registration_id IN ({placeholders}) ORDER BY m.id ASC',
+        reg_ids
+    ).fetchall()
+    # Mark admin messages as read
+    unread_ids = [dict(m)['id'] for m in msgs if dict(m)['sender'] == 'admin' and not dict(m)['read_at']]
+    if unread_ids:
+        ph = ','.join('?' * len(unread_ids))
+        db.execute(f'UPDATE messages SET read_at=? WHERE id IN ({ph})', [datetime.utcnow().isoformat() + 'Z'] + unread_ids)
+        db.commit()
+    db.close()
+    return jsonify(ok=True, data=[dict(m) for m in msgs])
+
+# ── API: user send reply ──────────────────────────────────
+@app.route('/api/messages', methods=['POST'])
+def user_reply():
+    d = request.get_json(silent=True)
+    if not d:
+        return jsonify(ok=False, error='Invalid JSON'), 400
+    email = (d.get('email') or '').strip().lower()
+    token = (d.get('token') or '').strip()
+    content = (d.get('content') or '').strip()
+    reg_id = d.get('registration_id')
+    if not email or not token or not content or not reg_id:
+        return jsonify(ok=False, error='Missing required fields'), 400
+    if len(content) > 5000:
+        return jsonify(ok=False, error='Message too long'), 400
+    expected = hmac.new(ADMIN_SECRET.encode(), email.encode(), hashlib.sha256).hexdigest()[:16]
+    if not hmac.compare_digest(token, expected):
+        return jsonify(ok=False, error='Invalid token'), 403
+    db = get_db()
+    reg = db.execute('SELECT id FROM registrations WHERE id=? AND LOWER(email)=?', (reg_id, email)).fetchone()
+    if not reg:
+        db.close()
+        return jsonify(ok=False, error='Registration not found'), 404
+    db.execute(
+        'INSERT INTO messages (registration_id, sender, content, created_at) VALUES (?,?,?,?)',
+        (reg_id, 'user', content, datetime.utcnow().isoformat() + 'Z')
+    )
+    db.commit()
+    db.close()
+    return jsonify(ok=True, message='Reply sent')
+
+# ── API: admin unread count ───────────────────────────────
+@app.route('/api/admin/unread')
+def admin_unread():
+    if not check_admin():
+        return jsonify(ok=False, error='Unauthorized'), 401
+    db = get_db()
+    rows = db.execute(
+        "SELECT m.registration_id, r.name, r.email, COUNT(*) as count FROM messages m JOIN registrations r ON m.registration_id=r.id WHERE m.sender='user' AND m.read_at IS NULL GROUP BY m.registration_id"
+    ).fetchall()
+    db.close()
+    return jsonify(ok=True, data=[dict(r) for r in rows])
+
+# ── API: admin mark messages read ─────────────────────────
+@app.route('/api/admin/messages/<int:reg_id>/read', methods=['POST'])
+def admin_mark_read(reg_id):
+    if not check_admin():
+        return jsonify(ok=False, error='Unauthorized'), 401
+    db = get_db()
+    db.execute("UPDATE messages SET read_at=? WHERE registration_id=? AND sender='user' AND read_at IS NULL",
+               (datetime.utcnow().isoformat() + 'Z', reg_id))
+    db.commit()
+    db.close()
+    return jsonify(ok=True)
 
 # ── SEO: sitemap & robots ─────────────────────────────────
 @app.route('/robots.txt')

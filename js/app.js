@@ -12,6 +12,7 @@
   Router.on('/events', renderEvents);
   Router.on('/news', renderNews);
   Router.on('/test-drive', renderTestDrive);
+  Router.on('/messages', renderMessages);
   Router.start();
 
   // Search

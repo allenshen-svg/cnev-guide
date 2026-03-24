@@ -474,7 +474,10 @@ async function submitTestDrive(e) {
         <div style="font-size:48px;margin-bottom:16px">✅</div>
         <h2>Thank You, ${data.name}!</h2>
         <p style="color:var(--tx2);margin-top:8px">Your test drive interest has been registered. We'll contact you at <b>${data.email}</b> with trip details and scheduling options.</p>
-        <a href="#/" class="cta-btn" style="display:inline-block;margin-top:20px">← Back to Home</a>
+        <p style="color:var(--tx2);margin-top:12px">You can check your messages anytime:</p>
+        <a href="#/messages" class="cta-btn" style="display:inline-block;margin-top:12px">📬 My Messages</a>
+        <br>
+        <a href="#/" class="cta-btn" style="display:inline-block;margin-top:12px;background:var(--sf2);color:var(--tx)">← Back to Home</a>
       </div>
     `;
   } catch (err) {
@@ -483,4 +486,163 @@ async function submitTestDrive(e) {
     alert(err.message || 'Network error, please try again');
   }
   return false;
+}
+
+/* ── User Messages Page ── */
+function renderMessages() {
+  const saved = localStorage.getItem('cnev_msg_email') || '';
+  app().innerHTML = `
+    <div class="breadcrumb"><a href="#/">Home</a> / <span>My Messages</span></div>
+    <div class="td-form-wrap" style="max-width:700px">
+      <h2>📬 My Messages</h2>
+      <p style="color:var(--tx2);margin-bottom:20px">Enter your registered email to view messages from the CNEV Guide team.</p>
+      <div id="msgLogin" style="${saved ? 'display:none' : ''}">
+        <div class="form-group">
+          <label>Your registered email</label>
+          <input type="email" id="msgEmail" placeholder="your@email.com" value="${saved}">
+        </div>
+        <button class="td-submit" onclick="loadUserMessages()">View Messages →</button>
+      </div>
+      <div id="msgContent" style="${saved ? '' : 'display:none'}">
+        <div id="msgEmailDisplay" style="font-size:13px;color:var(--tx2);margin-bottom:16px">${saved ? 'Logged in as <b>' + saved + '</b> · <a href="javascript:void(0)" onclick="msgLogout()" style="color:var(--pri)">Switch account</a>' : ''}</div>
+        <div id="userMsgList"></div>
+      </div>
+    </div>
+  `;
+  if (saved) loadUserMessages();
+}
+
+async function loadUserMessages() {
+  const emailEl = $('msgEmail');
+  const email = (emailEl ? emailEl.value : localStorage.getItem('cnev_msg_email') || '').trim().toLowerCase();
+  if (!email || !email.includes('@')) { alert('Please enter a valid email'); return; }
+
+  // Generate token (HMAC on client would need the secret — instead we ask server)
+  // Token is derived from email on server side; we pass email and get token via a lightweight endpoint
+  // For simplicity, we use a token-fetch approach
+  localStorage.setItem('cnev_msg_email', email);
+  const tokenR = await fetch('/api/message-token?email=' + encodeURIComponent(email));
+  const tokenD = await tokenR.json();
+  if (!tokenD.ok) {
+    $('userMsgList').innerHTML = '<div style="text-align:center;padding:30px;color:var(--tx2)">No registrations found for this email.</div>';
+    $('msgLogin').style.display = 'none';
+    $('msgContent').style.display = '';
+    $('msgEmailDisplay').innerHTML = 'Email: <b>' + email + '</b> · <a href="javascript:void(0)" onclick="msgLogout()" style="color:var(--pri)">Switch</a>';
+    return;
+  }
+  const token = tokenD.token;
+  const regIds = tokenD.registrations;
+  localStorage.setItem('cnev_msg_token', token);
+
+  // Fetch messages
+  const r = await fetch('/api/messages?email=' + encodeURIComponent(email) + '&token=' + token);
+  const d = await r.json();
+
+  $('msgLogin').style.display = 'none';
+  $('msgContent').style.display = '';
+  $('msgEmailDisplay').innerHTML = 'Logged in as <b>' + email + '</b> · <a href="javascript:void(0)" onclick="msgLogout()" style="color:var(--pri)">Switch account</a>';
+
+  if (!d.ok || !d.data.length) {
+    $('userMsgList').innerHTML = `
+      <div style="text-align:center;padding:30px;color:var(--tx2)">
+        <div style="font-size:36px;margin-bottom:12px">📭</div>
+        <p>No messages yet. Our team will reach out to you soon!</p>
+      </div>
+    `;
+    // Still show reply box for each registration
+    if (regIds && regIds.length) {
+      $('userMsgList').innerHTML += regIds.map(r => `
+        <div class="user-reply-box" style="margin-top:16px;padding:16px;background:var(--sf2);border-radius:var(--r)">
+          <div style="font-size:13px;color:var(--tx2);margin-bottom:8px">Send a message (Registration #${r.id})</div>
+          <div style="display:flex;gap:8px">
+            <input type="text" id="reply_${r.id}" placeholder="Type a message…" style="flex:1;padding:8px 12px;border:1px solid var(--bd);border-radius:8px;font-size:14px" onkeydown="if(event.key==='Enter')sendUserReply(${r.id},'${email}','${token}')">
+            <button class="td-submit" style="padding:8px 16px;margin:0" onclick="sendUserReply(${r.id},'${email}','${token}')">Send</button>
+          </div>
+        </div>
+      `).join('');
+    }
+    return;
+  }
+
+  // Group messages by registration
+  const grouped = {};
+  d.data.forEach(m => {
+    if (!grouped[m.registration_id]) grouped[m.registration_id] = [];
+    grouped[m.registration_id].push(m);
+  });
+
+  let html = '';
+  for (const regId of Object.keys(grouped)) {
+    const msgs = grouped[regId];
+    html += `<div style="margin-bottom:24px;border:1px solid var(--bd);border-radius:var(--r);overflow:hidden">
+      <div style="background:var(--sf2);padding:10px 14px;font-size:13px;font-weight:600;color:var(--tx2)">Registration #${regId}</div>
+      <div style="padding:14px;display:flex;flex-direction:column;gap:10px">
+        ${msgs.map(m => `
+          <div style="max-width:80%;padding:10px 14px;border-radius:12px;font-size:14px;line-height:1.5;
+            ${m.sender === 'admin' ? 'align-self:flex-start;background:#10b981;color:#fff;border-bottom-left-radius:4px' : 'align-self:flex-end;background:var(--sf2);color:var(--tx);border-bottom-right-radius:4px'}">
+            <div>${escHtml(m.content)}</div>
+            <div style="font-size:11px;${m.sender === 'admin' ? 'color:rgba(255,255,255,.7)' : 'color:var(--tx3)'};margin-top:4px">
+              ${m.sender === 'admin' ? '👤 CNEV Team' : '🙋 You'} · ${new Date(m.created_at).toLocaleDateString('en-US', {month:'short',day:'numeric'})} ${new Date(m.created_at).toLocaleTimeString('en-US', {hour:'2-digit',minute:'2-digit'})}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+      <div style="padding:10px 14px;border-top:1px solid var(--bd);display:flex;gap:8px">
+        <input type="text" id="reply_${regId}" placeholder="Type a reply…" style="flex:1;padding:8px 12px;border:1px solid var(--bd);border-radius:8px;font-size:14px" onkeydown="if(event.key==='Enter')sendUserReply(${regId},'${email}','${token}')">
+        <button class="td-submit" style="padding:8px 16px;margin:0" onclick="sendUserReply(${regId},'${email}','${token}')">Send</button>
+      </div>
+    </div>`;
+  }
+
+  // Also add reply boxes for registrations with no messages yet
+  if (regIds) {
+    for (const r of regIds) {
+      if (!grouped[r.id]) {
+        html += `
+        <div style="margin-bottom:16px;padding:16px;background:var(--sf2);border-radius:var(--r)">
+          <div style="font-size:13px;color:var(--tx2);margin-bottom:8px">Registration #${r.id} — No messages yet</div>
+          <div style="display:flex;gap:8px">
+            <input type="text" id="reply_${r.id}" placeholder="Type a message…" style="flex:1;padding:8px 12px;border:1px solid var(--bd);border-radius:8px;font-size:14px" onkeydown="if(event.key==='Enter')sendUserReply(${r.id},'${email}','${token}')">
+            <button class="td-submit" style="padding:8px 16px;margin:0" onclick="sendUserReply(${r.id},'${email}','${token}')">Send</button>
+          </div>
+        </div>`;
+      }
+    }
+  }
+
+  $('userMsgList').innerHTML = html;
+}
+
+async function sendUserReply(regId, email, token) {
+  const input = $('reply_' + regId);
+  if (!input) return;
+  const content = input.value.trim();
+  if (!content) return;
+  input.value = '';
+  try {
+    const r = await fetch('/api/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, token, registration_id: regId, content })
+    });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error);
+    await loadUserMessages();
+  } catch (e) {
+    alert('Failed to send: ' + (e.message || 'Network error'));
+    input.value = content;
+  }
+}
+
+function msgLogout() {
+  localStorage.removeItem('cnev_msg_email');
+  localStorage.removeItem('cnev_msg_token');
+  renderMessages();
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
 }

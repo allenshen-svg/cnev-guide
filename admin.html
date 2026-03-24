@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ChinaEV Admin — Registrations</title>
+<title>CNEV Guide Admin</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f1f5f9;color:#0f172a}
@@ -17,31 +17,57 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .auth-box button{width:100%;padding:10px;background:#10b981;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer}
 .auth-box button:hover{background:#059669}
 .auth-box .err{color:#ef4444;font-size:13px;margin-top:8px}
-.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:20px}
-.stat{background:#fff;border-radius:10px;padding:16px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px}
+.stat{background:#fff;border-radius:10px;padding:16px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.06);cursor:default}
 .stat .num{font-size:28px;font-weight:800;color:#10b981}
 .stat .label{font-size:12px;color:#64748b;margin-top:2px}
+.stat.alert .num{color:#ef4444}
 table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06)}
 th,td{padding:10px 12px;text-align:left;border-bottom:1px solid #e2e8f0;font-size:13px}
 th{background:#f8fafc;font-weight:600;color:#64748b;position:sticky;top:0}
 tr:hover{background:#f0fdf4}
+tr.has-unread{background:#eff6ff}
 .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
 .badge-new{background:#dbeafe;color:#2563eb}
 .badge-contacted{background:#fef3c7;color:#d97706}
 .badge-confirmed{background:#d1fae5;color:#059669}
 .badge-completed{background:#e2e8f0;color:#475569}
 .badge-cancelled{background:#fee2e2;color:#dc2626}
+.unread-dot{display:inline-block;width:8px;height:8px;background:#ef4444;border-radius:50%;margin-right:4px;vertical-align:middle}
 select.status-sel{padding:4px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;cursor:pointer}
 .empty{text-align:center;padding:60px;color:#94a3b8;font-size:15px}
 .toolbar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
 .toolbar input{padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;flex:1;max-width:300px}
 .toolbar select{padding:8px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px}
 .toolbar .count{margin-left:auto;font-size:13px;color:#64748b}
+.btn-msg{background:none;border:1px solid #10b981;color:#10b981;padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer;white-space:nowrap}
+.btn-msg:hover{background:#10b981;color:#fff}
+/* Modal */
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);z-index:1000;display:flex;align-items:center;justify-content:center}
+.modal{background:#fff;border-radius:12px;width:600px;max-width:90vw;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.modal-header{padding:16px 20px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between}
+.modal-header h3{font-size:16px}
+.modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:#64748b;padding:4px 8px}
+.modal-close:hover{color:#0f172a}
+.modal-body{padding:20px;overflow-y:auto;flex:1}
+.msg-list{display:flex;flex-direction:column;gap:12px;margin-bottom:16px;min-height:60px}
+.msg{max-width:80%;padding:10px 14px;border-radius:12px;font-size:14px;line-height:1.5;position:relative}
+.msg .msg-time{font-size:11px;color:#94a3b8;margin-top:4px}
+.msg.admin{align-self:flex-end;background:#10b981;color:#fff;border-bottom-right-radius:4px}
+.msg.admin .msg-time{color:rgba(255,255,255,.7)}
+.msg.user{align-self:flex-start;background:#f1f5f9;color:#0f172a;border-bottom-left-radius:4px}
+.msg-compose{display:flex;gap:8px;padding:16px 20px;border-top:1px solid #e2e8f0}
+.msg-compose textarea{flex:1;padding:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;resize:none;font-family:inherit}
+.msg-compose button{padding:10px 20px;background:#10b981;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;white-space:nowrap}
+.msg-compose button:hover{background:#059669}
+.msg-empty{text-align:center;padding:30px;color:#94a3b8;font-size:14px}
+.user-info{background:#f8fafc;padding:12px;border-radius:8px;margin-bottom:16px;font-size:13px;line-height:1.6}
+.user-info b{color:#0f172a}
 </style>
 </head>
 <body>
 <div class="header">
-  <h1>⚡ ChinaEV Admin</h1>
+  <h1>⚡ CNEV Guide Admin</h1>
   <span id="headerInfo"></span>
 </div>
 
@@ -54,7 +80,7 @@ select.status-sel{padding:4px 8px;border:1px solid #e2e8f0;border-radius:6px;fon
     <div id="authErr" class="err"></div>
   </div>
 
-  <!-- Dashboard (hidden until auth) -->
+  <!-- Dashboard -->
   <div id="dashboard" style="display:none">
     <div class="stats" id="stats"></div>
     <div class="toolbar">
@@ -73,8 +99,8 @@ select.status-sel{padding:4px 8px;border:1px solid #e2e8f0;border-radius:6px;fon
       <table>
         <thead><tr>
           <th>#</th><th>Name</th><th>Email</th><th>Country</th><th>Phone</th>
-          <th>Brands</th><th>Period</th><th>Duration</th><th>Notes</th>
-          <th>Status</th><th>Date</th>
+          <th>Brands</th><th>Period</th><th>Notes</th>
+          <th>Status</th><th>Date</th><th>Messages</th>
         </tr></thead>
         <tbody id="tbody"></tbody>
       </table>
@@ -83,9 +109,29 @@ select.status-sel{padding:4px 8px;border:1px solid #e2e8f0;border-radius:6px;fon
   </div>
 </div>
 
+<!-- Message Modal -->
+<div id="msgModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeMsgModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="msgTitle">Messages</h3>
+      <button class="modal-close" onclick="closeMsgModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="msgUserInfo" class="user-info"></div>
+      <div id="msgList" class="msg-list"></div>
+    </div>
+    <div class="msg-compose">
+      <textarea id="msgInput" rows="2" placeholder="Type a message…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}"></textarea>
+      <button onclick="sendMsg()">Send</button>
+    </div>
+  </div>
+</div>
+
 <script>
 let adminKey = '';
 let allData = [];
+let unreadMap = {};
+let currentRegId = null;
 
 function doLogin() {
   adminKey = document.getElementById('adminKey').value.trim();
@@ -101,6 +147,7 @@ async function fetchData() {
     allData = d.data;
     document.getElementById('authBox').style.display = 'none';
     document.getElementById('dashboard').style.display = '';
+    await fetchUnread();
     document.getElementById('headerInfo').textContent = allData.length + ' registrations';
     renderStats();
     renderTable();
@@ -109,17 +156,30 @@ async function fetchData() {
   }
 }
 
+async function fetchUnread() {
+  try {
+    const r = await fetch('/api/admin/unread', { headers: { 'X-Admin-Key': adminKey } });
+    const d = await r.json();
+    if (d.ok) {
+      unreadMap = {};
+      d.data.forEach(u => { unreadMap[u.registration_id] = u.count; });
+    }
+  } catch (e) {}
+}
+
 function renderStats() {
   const total = allData.length;
   const byStatus = {};
   allData.forEach(r => { byStatus[r.status] = (byStatus[r.status]||0) + 1; });
   const countries = new Set(allData.map(r => r.country)).size;
+  const totalUnread = Object.values(unreadMap).reduce((a, b) => a + b, 0);
   document.getElementById('stats').innerHTML = `
     <div class="stat"><div class="num">${total}</div><div class="label">Total</div></div>
     <div class="stat"><div class="num">${byStatus.new||0}</div><div class="label">New</div></div>
     <div class="stat"><div class="num">${byStatus.contacted||0}</div><div class="label">Contacted</div></div>
     <div class="stat"><div class="num">${byStatus.confirmed||0}</div><div class="label">Confirmed</div></div>
     <div class="stat"><div class="num">${countries}</div><div class="label">Countries</div></div>
+    <div class="stat${totalUnread?' alert':''}"><div class="num">${totalUnread}</div><div class="label">Unread Msgs</div></div>
   `;
 }
 
@@ -133,21 +193,24 @@ function renderTable() {
   document.getElementById('countLabel').textContent = rows.length + ' of ' + allData.length;
   document.getElementById('emptyMsg').style.display = rows.length ? 'none' : '';
 
-  document.getElementById('tbody').innerHTML = rows.map(r => `<tr>
+  document.getElementById('tbody').innerHTML = rows.map(r => {
+    const unread = unreadMap[r.id] || 0;
+    return `<tr class="${unread ? 'has-unread' : ''}">
     <td>${r.id}</td>
-    <td><b>${esc(r.name)}</b></td>
+    <td><b>${unread ? '<span class="unread-dot"></span>' : ''}${esc(r.name)}</b></td>
     <td><a href="mailto:${esc(r.email)}">${esc(r.email)}</a></td>
     <td>${esc(r.country)}</td>
     <td>${esc(r.phone)}</td>
     <td>${esc(r.brands)}</td>
     <td>${esc(r.period)}</td>
-    <td>${esc(r.duration)}</td>
-    <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.notes)}">${esc(r.notes)}</td>
+    <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.notes)}">${esc(r.notes)}</td>
     <td><select class="status-sel" onchange="updateStatus(${r.id},this.value)">
       ${['new','contacted','confirmed','completed','cancelled'].map(s => `<option value="${s}"${r.status===s?' selected':''}>${s}</option>`).join('')}
     </select></td>
     <td style="white-space:nowrap">${r.created_at ? r.created_at.slice(0,10) : ''}</td>
-  </tr>`).join('');
+    <td><button class="btn-msg" onclick="openMsgModal(${r.id})">💬${unread ? ' ('+unread+')' : ''}</button></td>
+  </tr>`;
+  }).join('');
 }
 
 async function updateStatus(id, status) {
@@ -161,12 +224,93 @@ async function updateStatus(id, status) {
   renderStats();
 }
 
+// ── Message Modal ──
+async function openMsgModal(regId) {
+  currentRegId = regId;
+  const reg = allData.find(r => r.id === regId);
+  document.getElementById('msgTitle').textContent = 'Messages — ' + (reg ? reg.name : '#' + regId);
+  document.getElementById('msgUserInfo').innerHTML = reg ? `
+    <b>${esc(reg.name)}</b> · ${esc(reg.email)} · ${esc(reg.country)}<br>
+    Brands: ${esc(reg.brands) || '—'} · Period: ${esc(reg.period) || '—'} · Duration: ${esc(reg.duration) || '—'}
+    ${reg.notes ? '<br>Notes: ' + esc(reg.notes) : ''}
+  ` : '';
+  document.getElementById('msgModal').style.display = 'flex';
+  document.getElementById('msgInput').value = '';
+  await loadMessages(regId);
+}
+
+async function loadMessages(regId) {
+  const list = document.getElementById('msgList');
+  list.innerHTML = '<div class="msg-empty">Loading…</div>';
+  try {
+    const r = await fetch('/api/admin/messages/' + regId, { headers: { 'X-Admin-Key': adminKey } });
+    const d = await r.json();
+    if (!d.ok || !d.data.length) {
+      list.innerHTML = '<div class="msg-empty">No messages yet. Send the first message below.</div>';
+      return;
+    }
+    list.innerHTML = d.data.map(m => `
+      <div class="msg ${m.sender}">
+        <div>${esc(m.content)}</div>
+        <div class="msg-time">${m.sender === 'admin' ? '👤 Admin' : '🙋 User'} · ${formatTime(m.created_at)}${m.read_at ? ' · ✓ Read' : ''}</div>
+      </div>
+    `).join('');
+    list.scrollTop = list.scrollHeight;
+    // Mark user messages as read
+    if (d.data.some(m => m.sender === 'user' && !m.read_at)) {
+      await fetch('/api/admin/messages/' + regId + '/read', { method: 'POST', headers: { 'X-Admin-Key': adminKey } });
+      delete unreadMap[regId];
+      renderStats();
+      renderTable();
+    }
+  } catch (e) {
+    list.innerHTML = '<div class="msg-empty">Error loading messages</div>';
+  }
+}
+
+async function sendMsg() {
+  const input = document.getElementById('msgInput');
+  const content = input.value.trim();
+  if (!content || !currentRegId) return;
+  input.value = '';
+  try {
+    await fetch('/api/admin/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Key': adminKey },
+      body: JSON.stringify({ registration_id: currentRegId, content })
+    });
+    await loadMessages(currentRegId);
+  } catch (e) {
+    alert('Failed to send message');
+    input.value = content;
+  }
+}
+
+function closeMsgModal() {
+  document.getElementById('msgModal').style.display = 'none';
+  currentRegId = null;
+}
+
+function formatTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
+
 function esc(s) {
   if (!s) return '';
   const d = document.createElement('div');
   d.textContent = s;
   return d.innerHTML;
 }
+
+// Auto-refresh unread every 30s
+setInterval(async () => {
+  if (!adminKey) return;
+  await fetchUnread();
+  renderStats();
+  renderTable();
+}, 30000);
 </script>
 </body>
 </html>
