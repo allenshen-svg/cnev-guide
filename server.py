@@ -139,6 +139,40 @@ def update_registration(rid):
 def admin_page():
     return send_from_directory(BASE, 'admin.html')
 
+# ── SEO: sitemap & robots ─────────────────────────────────
+@app.route('/robots.txt')
+def robots():
+    txt = "User-agent: *\nAllow: /\nSitemap: https://cnevguide.com/sitemap.xml\n"
+    return txt, 200, {'Content-Type': 'text/plain'}
+
+@app.route('/sitemap.xml')
+def sitemap():
+    import json as _json
+    data_path = os.path.join(BASE, 'data', 'ev_data.json')
+    with open(data_path) as f:
+        data = _json.load(f)
+    base_url = 'https://cnevguide.com'
+    pages = [
+        ('/', '1.0', 'daily'),
+        ('/#/brands', '0.9', 'weekly'),
+        ('/#/cars', '0.9', 'weekly'),
+        ('/#/compare', '0.7', 'monthly'),
+        ('/#/events', '0.6', 'weekly'),
+        ('/#/news', '0.6', 'daily'),
+        ('/#/test-drive', '0.8', 'monthly'),
+    ]
+    for b in data.get('brands', []):
+        pages.append((f'/#/brand/{b["id"]}', '0.8', 'weekly'))
+    for c in data.get('cars', []):
+        pages.append((f'/#/car/{c["id"]}', '0.7', 'weekly'))
+
+    xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    for path, prio, freq in pages:
+        xml += f'  <url><loc>{base_url}{path}</loc><priority>{prio}</priority><changefreq>{freq}</changefreq></url>\n'
+    xml += '</urlset>\n'
+    return xml, 200, {'Content-Type': 'application/xml'}
+
 # ──────────────────────────────────────────────────────────
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', '8090'))
