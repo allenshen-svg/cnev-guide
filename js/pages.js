@@ -398,10 +398,37 @@ function renderTestDrive() {
             <label>Country / Region *</label>
             <select id="tdCountry" required>
               <option value="">Select your country</option>
-              <option>United States</option><option>United Kingdom</option><option>Germany</option>
-              <option>France</option><option>Australia</option><option>Japan</option><option>South Korea</option>
-              <option>Singapore</option><option>Malaysia</option><option>Thailand</option><option>UAE</option>
-              <option>Canada</option><option>Brazil</option><option>Other</option>
+              <option>Afghanistan</option><option>Albania</option><option>Algeria</option><option>Argentina</option>
+              <option>Armenia</option><option>Australia</option><option>Austria</option><option>Azerbaijan</option>
+              <option>Bahrain</option><option>Bangladesh</option><option>Belarus</option><option>Belgium</option>
+              <option>Bolivia</option><option>Bosnia and Herzegovina</option><option>Brazil</option><option>Brunei</option>
+              <option>Bulgaria</option><option>Cambodia</option><option>Cameroon</option><option>Canada</option>
+              <option>Chile</option><option>Colombia</option><option>Costa Rica</option><option>Croatia</option>
+              <option>Cuba</option><option>Cyprus</option><option>Czech Republic</option><option>Denmark</option>
+              <option>Dominican Republic</option><option>Ecuador</option><option>Egypt</option><option>El Salvador</option>
+              <option>Estonia</option><option>Ethiopia</option><option>Finland</option><option>France</option>
+              <option>Georgia</option><option>Germany</option><option>Ghana</option><option>Greece</option>
+              <option>Guatemala</option><option>Honduras</option><option>Hong Kong</option><option>Hungary</option>
+              <option>Iceland</option><option>India</option><option>Indonesia</option><option>Iran</option>
+              <option>Iraq</option><option>Ireland</option><option>Israel</option><option>Italy</option>
+              <option>Jamaica</option><option>Japan</option><option>Jordan</option><option>Kazakhstan</option>
+              <option>Kenya</option><option>Kuwait</option><option>Laos</option><option>Latvia</option>
+              <option>Lebanon</option><option>Libya</option><option>Lithuania</option><option>Luxembourg</option>
+              <option>Macau</option><option>Malaysia</option><option>Maldives</option><option>Mexico</option>
+              <option>Moldova</option><option>Mongolia</option><option>Montenegro</option><option>Morocco</option>
+              <option>Myanmar</option><option>Nepal</option><option>Netherlands</option><option>New Zealand</option>
+              <option>Nicaragua</option><option>Nigeria</option><option>North Macedonia</option><option>Norway</option>
+              <option>Oman</option><option>Pakistan</option><option>Palestine</option><option>Panama</option>
+              <option>Paraguay</option><option>Peru</option><option>Philippines</option><option>Poland</option>
+              <option>Portugal</option><option>Qatar</option><option>Romania</option><option>Russia</option>
+              <option>Saudi Arabia</option><option>Senegal</option><option>Serbia</option><option>Singapore</option>
+              <option>Slovakia</option><option>Slovenia</option><option>South Africa</option><option>South Korea</option>
+              <option>Spain</option><option>Sri Lanka</option><option>Sudan</option><option>Sweden</option>
+              <option>Switzerland</option><option>Syria</option><option>Taiwan</option><option>Tanzania</option>
+              <option>Thailand</option><option>Tunisia</option><option>Turkey</option><option>UAE</option>
+              <option>Uganda</option><option>Ukraine</option><option>United Kingdom</option><option>United States</option>
+              <option>Uruguay</option><option>Uzbekistan</option><option>Venezuela</option><option>Vietnam</option>
+              <option>Yemen</option><option>Zambia</option><option>Zimbabwe</option><option>Other</option>
             </select>
           </div>
           <div class="form-group">

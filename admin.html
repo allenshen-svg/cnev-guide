@@ -63,6 +63,12 @@ select.status-sel{padding:4px 8px;border:1px solid #e2e8f0;border-radius:6px;fon
 .msg-empty{text-align:center;padding:30px;color:#94a3b8;font-size:14px}
 .user-info{background:#f8fafc;padding:12px;border-radius:8px;margin-bottom:16px;font-size:13px;line-height:1.6}
 .user-info b{color:#0f172a}
+/* Tabs */
+.tabs{display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid #e2e8f0}
+.tab{padding:10px 20px;font-size:14px;font-weight:600;color:#64748b;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s}
+.tab:hover{color:#10b981}
+.tab.active{color:#10b981;border-bottom-color:#10b981}
+.tab .badge-count{background:#10b981;color:#fff;font-size:11px;padding:1px 7px;border-radius:10px;margin-left:6px}
 </style>
 </head>
 <body>
@@ -83,29 +89,57 @@ select.status-sel{padding:4px 8px;border:1px solid #e2e8f0;border-radius:6px;fon
   <!-- Dashboard -->
   <div id="dashboard" style="display:none">
     <div class="stats" id="stats"></div>
-    <div class="toolbar">
-      <input type="text" id="search" placeholder="Search name, email, country…" oninput="renderTable()">
-      <select id="filterStatus" onchange="renderTable()">
-        <option value="">All Status</option>
-        <option value="new">New</option>
-        <option value="contacted">Contacted</option>
-        <option value="confirmed">Confirmed</option>
-        <option value="completed">Completed</option>
-        <option value="cancelled">Cancelled</option>
-      </select>
-      <span class="count" id="countLabel"></span>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <div class="tab active" id="tabReg" onclick="switchTab('reg')">Test Drive Registrations</div>
+      <div class="tab" id="tabUsers" onclick="switchTab('users')">App Users <span class="badge-count" id="userCountBadge">0</span></div>
     </div>
-    <div style="overflow-x:auto">
-      <table>
-        <thead><tr>
-          <th>#</th><th>Name</th><th>Email</th><th>Country</th><th>Phone</th>
-          <th>Brands</th><th>Period</th><th>Notes</th>
-          <th>Status</th><th>Date</th><th>Messages</th>
-        </tr></thead>
-        <tbody id="tbody"></tbody>
-      </table>
+
+    <!-- Registrations Tab -->
+    <div id="panelReg">
+      <div class="toolbar">
+        <input type="text" id="search" placeholder="Search name, email, country…" oninput="renderTable()">
+        <select id="filterStatus" onchange="renderTable()">
+          <option value="">All Status</option>
+          <option value="new">New</option>
+          <option value="contacted">Contacted</option>
+          <option value="confirmed">Confirmed</option>
+          <option value="completed">Completed</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+        <span class="count" id="countLabel"></span>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr>
+            <th>#</th><th>Name</th><th>Email</th><th>Country</th><th>Phone</th>
+            <th>Brands</th><th>Period</th><th>Notes</th>
+            <th>Status</th><th>Date</th><th>Messages</th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div id="emptyMsg" class="empty" style="display:none">No registrations yet</div>
     </div>
-    <div id="emptyMsg" class="empty" style="display:none">No registrations yet</div>
+
+    <!-- App Users Tab -->
+    <div id="panelUsers" style="display:none">
+      <div class="toolbar">
+        <input type="text" id="userSearch" placeholder="Search nickname, email, device…" oninput="renderUsers()">
+        <span class="count" id="userCountLabel"></span>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr>
+            <th>#</th><th>UID</th><th>Nickname</th><th>Email</th><th>Locale</th>
+            <th>Device</th><th>App Version</th><th>Registered</th><th>Last Login</th><th>IP</th>
+          </tr></thead>
+          <tbody id="userTbody"></tbody>
+        </table>
+      </div>
+      <div id="userEmptyMsg" class="empty" style="display:none">No app users yet</div>
+    </div>
   </div>
 </div>
 
@@ -132,6 +166,15 @@ let adminKey = '';
 let allData = [];
 let unreadMap = {};
 let currentRegId = null;
+let appUsers = [];
+
+function switchTab(tab) {
+  document.getElementById('tabReg').classList.toggle('active', tab === 'reg');
+  document.getElementById('tabUsers').classList.toggle('active', tab === 'users');
+  document.getElementById('panelReg').style.display = tab === 'reg' ? '' : 'none';
+  document.getElementById('panelUsers').style.display = tab === 'users' ? '' : 'none';
+  if (tab === 'users' && !appUsers.length) fetchUsers();
+}
 
 function doLogin() {
   adminKey = document.getElementById('adminKey').value.trim();
@@ -148,6 +191,7 @@ async function fetchData() {
     document.getElementById('authBox').style.display = 'none';
     document.getElementById('dashboard').style.display = '';
     await fetchUnread();
+    await fetchUserCount();
     document.getElementById('headerInfo').textContent = allData.length + ' registrations';
     renderStats();
     renderTable();
@@ -164,6 +208,14 @@ async function fetchUnread() {
       unreadMap = {};
       d.data.forEach(u => { unreadMap[u.registration_id] = u.count; });
     }
+  } catch (e) {}
+}
+
+async function fetchUserCount() {
+  try {
+    const r = await fetch('/api/admin/users/count', { headers: { 'X-Admin-Key': adminKey } });
+    const d = await r.json();
+    if (d.ok) document.getElementById('userCountBadge').textContent = d.count;
   } catch (e) {}
 }
 
@@ -289,6 +341,39 @@ async function sendMsg() {
 function closeMsgModal() {
   document.getElementById('msgModal').style.display = 'none';
   currentRegId = null;
+}
+
+// ── App Users ──
+async function fetchUsers() {
+  try {
+    const r = await fetch('/api/admin/users', { headers: { 'X-Admin-Key': adminKey } });
+    const d = await r.json();
+    if (d.ok) {
+      appUsers = d.data;
+      document.getElementById('userCountBadge').textContent = appUsers.length;
+      renderUsers();
+    }
+  } catch (e) {}
+}
+
+function renderUsers() {
+  const q = (document.getElementById('userSearch').value || '').toLowerCase();
+  let rows = appUsers;
+  if (q) rows = rows.filter(u => (u.nickname+u.email+u.device+u.uid+u.locale).toLowerCase().includes(q));
+  document.getElementById('userCountLabel').textContent = rows.length + ' of ' + appUsers.length;
+  document.getElementById('userEmptyMsg').style.display = rows.length ? 'none' : '';
+  document.getElementById('userTbody').innerHTML = rows.map(u => `<tr>
+    <td>${u.id}</td>
+    <td style="font-size:11px;color:#94a3b8;max-width:100px;overflow:hidden;text-overflow:ellipsis" title="${esc(u.uid)}">${esc(u.uid ? u.uid.slice(0,8)+'…' : '')}</td>
+    <td><b>${esc(u.nickname)}</b></td>
+    <td><a href="mailto:${esc(u.email)}">${esc(u.email)}</a></td>
+    <td>${esc(u.locale)}</td>
+    <td>${esc(u.device)}</td>
+    <td>${esc(u.app_version)}</td>
+    <td style="white-space:nowrap">${u.created_at ? u.created_at.slice(0,10) : ''}</td>
+    <td style="white-space:nowrap">${u.last_login_at ? u.last_login_at.slice(0,16).replace('T',' ') : '—'}</td>
+    <td style="font-size:12px;color:#94a3b8">${esc(u.ip)}</td>
+  </tr>`).join('');
 }
 
 function formatTime(iso) {

@@ -1,0 +1,15 @@
+import paramiko
+ssh = paramiko.SSHClient()
+ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+ssh.connect('47.83.165.131', username='root', password='Allen1989716!', timeout=10)
+sftp = ssh.open_sftp()
+sftp.put('/Users/allen.shen/ev-car-web/js/pages.js', '/opt/cnev-guide/js/pages.js')
+sftp.close()
+import time
+stdin, stdout, stderr = ssh.exec_command('systemctl restart cnev-guide', timeout=10)
+stdout.read()
+time.sleep(2)
+stdin, stdout, stderr = ssh.exec_command('systemctl is-active cnev-guide', timeout=5)
+print('Service:', stdout.read().decode().strip())
+ssh.close()
+print('Deployed!')

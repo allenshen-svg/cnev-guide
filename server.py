@@ -1,12 +1,12 @@
-"""ChinaEV backend — serves static site + test-drive registration API"""
-import os, json, sqlite3, hashlib, hmac, time
+"""ChinaEV backend — serves static site + test-drive registration API + app user auth"""
+import os, json, sqlite3, hashlib, hmac, time, secrets
 from datetime import datetime
 from flask import Flask, request, jsonify, send_from_directory, abort
 from flask_cors import CORS
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE, 'data', 'registrations.db')
-ADMIN_SECRET = os.environ.get('ADMIN_SECRET', 'chinaev_admin_2026')
+ADMIN_SECRET = os.environ.get('ADMIN_SECRET', 'xiaoniqiu')
 
 app = Flask(__name__, static_folder=None)
 CORS(app)
@@ -47,6 +47,22 @@ def init_db():
         FOREIGN KEY (registration_id) REFERENCES registrations(id)
     )''')
     db.execute('CREATE INDEX IF NOT EXISTS idx_msg_reg ON messages(registration_id)')
+    db.execute('''CREATE TABLE IF NOT EXISTS app_users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        uid TEXT UNIQUE NOT NULL,
+        nickname TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        avatar_url TEXT DEFAULT '',
+        locale TEXT DEFAULT '',
+        device TEXT DEFAULT '',
+        app_version TEXT DEFAULT '',
+        created_at TEXT NOT NULL,
+        last_login_at TEXT DEFAULT NULL,
+        ip TEXT DEFAULT ''
+    )''')
+    db.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON app_users(email)')
+    db.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_uid ON app_users(uid)')
     db.commit()
     db.close()
 
@@ -55,8 +71,7 @@ init_db()
 # ── Admin auth ────────────────────────────────────────────
 def check_admin():
     key = request.headers.get('X-Admin-Key', '')
-    expected = hmac.new(ADMIN_SECRET.encode(), b'chinaev', hashlib.sha256).hexdigest()[:32]
-    return hmac.compare_digest(key, expected)
+    return hmac.compare_digest(key, ADMIN_SECRET)
 
 # ── Static files ──────────────────────────────────────────
 @app.route('/')
@@ -283,6 +298,105 @@ def admin_mark_read(reg_id):
     db.commit()
     db.close()
     return jsonify(ok=True)
+
+# ── App: user registration ────────────────────────────────
+def _hash_password(password, salt=None):
+    if salt is None:
+        salt = secrets.token_hex(16)
+    h = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000).hex()
+    return f'{salt}${h}'
+
+def _verify_password(password, stored):
+    if '$' not in stored:
+        return False
+    salt, _ = stored.split('$', 1)
+    return hmac.compare_digest(_hash_password(password, salt), stored)
+
+@app.route('/api/app/register', methods=['POST'])
+def app_register():
+    d = request.get_json(silent=True)
+    if not d:
+        return jsonify(ok=False, error='Invalid JSON'), 400
+    nickname = (d.get('nickname') or '').strip()
+    email = (d.get('email') or '').strip().lower()
+    password = (d.get('password') or '')
+    if not nickname or not email or not password:
+        return jsonify(ok=False, error='nickname, email, password required'), 400
+    if len(email) > 200 or '@' not in email:
+        return jsonify(ok=False, error='Invalid email'), 400
+    if len(password) < 6:
+        return jsonify(ok=False, error='Password must be at least 6 characters'), 400
+    if len(nickname) > 50:
+        return jsonify(ok=False, error='Nickname too long'), 400
+
+    uid = secrets.token_hex(12)
+    pwd_hash = _hash_password(password)
+    now = datetime.utcnow().isoformat() + 'Z'
+    locale = (d.get('locale') or '')[:10]
+    device = (d.get('device') or '')[:100]
+    app_version = (d.get('appVersion') or '')[:20]
+
+    db = get_db()
+    exists = db.execute('SELECT id FROM app_users WHERE email=?', (email,)).fetchone()
+    if exists:
+        db.close()
+        return jsonify(ok=False, error='Email already registered'), 409
+
+    db.execute(
+        'INSERT INTO app_users (uid, nickname, email, password_hash, locale, device, app_version, created_at, last_login_at, ip) VALUES (?,?,?,?,?,?,?,?,?,?)',
+        (uid, nickname, email, pwd_hash, locale, device, app_version, now, now, request.remote_addr or '')
+    )
+    db.commit()
+    token = hmac.new(ADMIN_SECRET.encode(), f'{uid}:{email}'.encode(), hashlib.sha256).hexdigest()[:32]
+    db.close()
+    return jsonify(ok=True, user={'uid': uid, 'nickname': nickname, 'email': email, 'createdAt': now}, token=token)
+
+@app.route('/api/app/login', methods=['POST'])
+def app_login():
+    d = request.get_json(silent=True)
+    if not d:
+        return jsonify(ok=False, error='Invalid JSON'), 400
+    email = (d.get('email') or '').strip().lower()
+    password = (d.get('password') or '')
+    if not email or not password:
+        return jsonify(ok=False, error='email and password required'), 400
+
+    db = get_db()
+    row = db.execute('SELECT * FROM app_users WHERE email=?', (email,)).fetchone()
+    if not row or not _verify_password(password, row['password_hash']):
+        db.close()
+        return jsonify(ok=False, error='Invalid email or password'), 401
+
+    now = datetime.utcnow().isoformat() + 'Z'
+    locale = (d.get('locale') or '')[:10]
+    device = (d.get('device') or '')[:100]
+    app_version = (d.get('appVersion') or '')[:20]
+    db.execute('UPDATE app_users SET last_login_at=?, locale=?, device=?, app_version=?, ip=? WHERE id=?',
+               (now, locale, device, app_version, request.remote_addr or '', row['id']))
+    db.commit()
+    uid = row['uid']
+    token = hmac.new(ADMIN_SECRET.encode(), f'{uid}:{email}'.encode(), hashlib.sha256).hexdigest()[:32]
+    db.close()
+    return jsonify(ok=True, user={'uid': uid, 'nickname': row['nickname'], 'email': email, 'createdAt': row['created_at']}, token=token)
+
+# ── Admin: app users ──────────────────────────────────────
+@app.route('/api/admin/users')
+def admin_list_users():
+    if not check_admin():
+        return jsonify(ok=False, error='Unauthorized'), 401
+    db = get_db()
+    rows = db.execute('SELECT id, uid, nickname, email, locale, device, app_version, created_at, last_login_at, ip FROM app_users ORDER BY id DESC').fetchall()
+    db.close()
+    return jsonify(ok=True, data=[dict(r) for r in rows])
+
+@app.route('/api/admin/users/count')
+def admin_user_count():
+    if not check_admin():
+        return jsonify(ok=False, error='Unauthorized'), 401
+    db = get_db()
+    count = db.execute('SELECT COUNT(*) FROM app_users').fetchone()[0]
+    db.close()
+    return jsonify(ok=True, count=count)
 
 # ── SEO: sitemap & robots ─────────────────────────────────
 @app.route('/robots.txt')

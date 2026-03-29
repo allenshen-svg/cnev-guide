@@ -1,0 +1,17 @@
+import paramiko, time
+ssh = paramiko.SSHClient()
+ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+ssh.connect('47.83.165.131', username='root', password='Allen1989716!', timeout=10)
+sftp = ssh.open_sftp()
+sftp.put('/Users/allen.shen/ev-car-web/server.py', '/opt/cnev-guide/server.py')
+sftp.close()
+stdin, stdout, stderr = ssh.exec_command('systemctl restart cnev-guide', timeout=10)
+stdout.read()
+time.sleep(2)
+stdin, stdout, stderr = ssh.exec_command('systemctl is-active cnev-guide', timeout=5)
+print('Service:', stdout.read().decode().strip())
+# Test new key
+stdin, stdout, stderr = ssh.exec_command('curl -s http://127.0.0.1:8090/api/admin/registrations -H "X-Admin-Key: 3b357ecf75b3bb294a0e9c09eed0d827" | head -20', timeout=10)
+print('API test:', stdout.read().decode().strip()[:80])
+ssh.close()
+print('Done!')
